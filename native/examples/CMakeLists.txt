@@ -8,10 +8,19 @@ project(SEALExamples VERSION 3.2.0 LANGUAGES CXX)
 # Executable will be in ../bin
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
 
-add_executable(sealexamples examples.cpp)
+add_executable(sealexamples examples.cpp /home/poa/MP-SPDZ/good_index.cpp share_at.cpp verifier_state.cpp pir.cpp pir_server.cpp pir_client.cpp)
 
 # Import Microsoft SEAL
 find_package(SEAL 3.2.0 EXACT REQUIRED)
 
 # Link Microsoft SEAL
 target_link_libraries(sealexamples SEAL::seal)
+
+
+# Link additional external libraries
+target_link_libraries(sealexamples gmp gmpxx cryptopp)
+target_link_libraries(sealexamples /home/poa/SealPIR/libsealpir.a)
+target_link_libraries(sealexamples  /home/poa/MP-SPDZ/libSPDZ.so /home/poa/MP-SPDZ/libFHE.so)
+include_directories( ${CMAKE_SOURCE_DIR} /home/poa/MP-SPDZ /home/poa/MP-SPDZ/local/lib /home/poa/MP-SPDZ/mpir/ /home/poa/SealPIR /usr/local/include )
+
+set(CMAKE_BUILD_TYPE DEBUG)
