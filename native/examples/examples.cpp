@@ -190,7 +190,7 @@ void oneofnot() {
     uint64_t size_per_item = 1280; // in bytes
     //uint64_t size_per_item = 128; // in bytes
     cout << "Size per item: " << size_per_item << " bytes" << endl;
-    uint32_t N = 4096; //degree polynomial for LWE
+    uint32_t N = 1024; //degree polynomial for LWE
     // for number_of_items = 2^24, N= 4096
     // number_of_items = 2^22, N= 2048
     // number_of_items = 2^12, N= 64

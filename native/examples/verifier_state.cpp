@@ -42,8 +42,11 @@ void verifier_state(byte tape[PRNG_IN],
     if (DEBUG) std::cout << "Starting share_at" << std::endl;
     for (unsigned int j=0; j<NUM_ITERATION; j++) {
         if (DEBUG) std::cout << "\tIteration " << j << std::endl;
-        for (unsigned int i=0; i<NUM_KEYS; i++) {
-           share_at(y_shares[i][j],y[i],H_OUT,(*eps)[j],r[j]);
+        share_at(y_shares[0][j],y[0],H_OUT,(*eps)[j],r[j]);
+        for (unsigned int i=1; i<NUM_KEYS; i++) {
+            for (unsigned int b = 0; b<H_OUT; b++) {
+                y_shares[i][j][b] = y_shares[0][j][b] ^ y[0][b] ^ y[i][b];
+            }
         }
     }
     if (DEBUG) std::cout << "End share_at" << std::endl;

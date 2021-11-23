@@ -6,7 +6,7 @@
 #define DEBUG 0
 
 /* Number of public key hashes in the disjunction */
-#define LOG_NUM_KEYS 22
+#define LOG_NUM_KEYS 16
 #define NUM_KEYS (1 << LOG_NUM_KEYS)
 
 /* Number of parties in the MPCitH proof */
@@ -14,7 +14,7 @@
 
 /* Number of iterations required to achieve soundness
  * (computed based on NUM_PARTIES) */
-#define NUM_ITERATION 64
+#define NUM_ITERATION 25
 
 /* Size of Hash output (in bytes) */
 #define H_OUT 32
