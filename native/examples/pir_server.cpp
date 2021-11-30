@@ -1,9 +1,14 @@
 #include "pir_server.hpp"
 #include "pir_client.hpp"
+#include "Timer.h"
+#include <vector>
+#include <future>
 
 using namespace std;
 using namespace seal;
 using namespace seal::util;
+
+#define NUM_THREADS 8
 
 PIRServer::PIRServer(const EncryptionParameters &params, const PirParams &pir_params) :
     params_(params), 
@@ -16,11 +21,26 @@ PIRServer::PIRServer(const EncryptionParameters &params, const PirParams &pir_pa
 
 void PIRServer::preprocess_database() {
     if (!is_db_preprocessed_) {
-
-        for (uint32_t i = 0; i < db_->size(); i++) {
-            evaluator_->transform_to_ntt_inplace(
-                db_->operator[](i), params_.parms_id());
-        }
+	auto f = [&](int i) {
+	    // Do Something
+	  for (int jdx = i; jdx < db_->size(); jdx += NUM_THREADS) {
+	    evaluator_->transform_to_ntt_inplace(
+	      db_->operator[](jdx), params_.parms_id());
+	  }
+	};
+	std::vector<std::thread> threads;
+	for (int idx = 0; idx < NUM_THREADS; idx++) {
+	  std::thread t(f, idx);
+	  threads.emplace_back(std::move(t));
+	}
+	
+	for (int idx = 0; idx < NUM_THREADS; idx++) {
+	  threads[idx].join();
+	}
+//         for (uint32_t i = 0; i < db_->size(); i++) {
+//             evaluator_->transform_to_ntt_inplace(
+//                 db_->operator[](i), params_.parms_id());
+//         }
 
         is_db_preprocessed_ = true;
     }
@@ -149,6 +169,8 @@ PirReply PIRServer::generate_reply(PirQuery query, uint32_t client_id) {
     int logt = floor(log2(params_.plain_modulus().value()));
 
     cout << "expansion ratio = " << pir_params_.expansion_ratio << endl; 
+    Timer duration;
+    
     for (uint32_t i = 0; i < nvec.size(); i++) {
         cout << "Server: " << i + 1 << "-th recursion level started " << endl; 
 
@@ -158,6 +180,8 @@ PirReply PIRServer::generate_reply(PirQuery query, uint32_t client_id) {
         uint64_t n_i = nvec[i];
         cout << "Server: n_i = " << n_i << endl; 
         cout << "Server: expanding " << query[i].size() << " query ctxts" << endl;
+	
+	
         for (uint32_t j = 0; j < query[i].size(); j++){
             uint64_t total = N; 
             if (j == query[i].size() - 1){
@@ -184,12 +208,12 @@ PirReply PIRServer::generate_reply(PirQuery query, uint32_t client_id) {
         }
         cout << endl;
         */
-
+	Timer query_ntt;
         // Transform expanded query to NTT, and ...
         for (uint32_t jj = 0; jj < expanded_query.size(); jj++) {
             evaluator_->transform_to_ntt_inplace(expanded_query[jj]);
         }
-
+	query_ntt.Tick("Query transform");
         // Transform plaintext to NTT. If database is pre-processed, can skip
         if ((!is_db_preprocessed_) || i > 0) {
             for (uint32_t jj = 0; jj < cur->size(); jj++) {
@@ -207,22 +231,48 @@ PirReply PIRServer::generate_reply(PirQuery query, uint32_t client_id) {
 
         vector<Ciphertext> intermediateCtxts(product);
         Ciphertext temp;
+	cout << "product = " << product << "*****************************" << endl;
+	if (true) {
+	  auto g = [&](int idx) {
+	      // Do Something
+	    Ciphertext temp;
+	    for (int k = idx; k < product; k += NUM_THREADS) {
+  	    if (k >= product) break;
+	      evaluator_->multiply_plain(expanded_query[0], (*cur)[k], intermediateCtxts[k]);
 
-        for (uint64_t k = 0; k < product; k++) {
+	      for (uint64_t jdx = 1; jdx < n_i; jdx++) {
+		  evaluator_->multiply_plain(expanded_query[jdx], (*cur)[k + jdx * product], temp);
+		  evaluator_->add_inplace(intermediateCtxts[k], temp); // Adds to first component.
+	      }
+	    }
+	  };
+	
+	  std::vector<std::thread> threads;
+	  for (int idx = 0; idx < NUM_THREADS; idx++) {
+	    std::thread t(g, idx);
+	    threads.emplace_back(std::move(t));
+	  }
+	  
+	  for (int idx = 0; idx < NUM_THREADS; idx++) {
+	    threads[idx].join();
+	  }
+	} else {
+	  for (uint64_t k = 0; k < product; k++) {
+	      evaluator_->multiply_plain(expanded_query[0], (*cur)[k], intermediateCtxts[k]);
 
-            evaluator_->multiply_plain(expanded_query[0], (*cur)[k], intermediateCtxts[k]);
-
-            for (uint64_t j = 1; j < n_i; j++) {
-                evaluator_->multiply_plain(expanded_query[j], (*cur)[k + j * product], temp);
-                evaluator_->add_inplace(intermediateCtxts[k], temp); // Adds to first component.
-            }
-        }
+	      for (uint64_t j = 1; j < n_i; j++) {
+		  evaluator_->multiply_plain(expanded_query[j], (*cur)[k + j * product], temp);
+		  evaluator_->add_inplace(intermediateCtxts[k], temp); // Adds to first component.
+	      }
+	  }
+	}
 
         for (uint32_t jj = 0; jj < intermediateCtxts.size(); jj++) {
             evaluator_->transform_from_ntt_inplace(intermediateCtxts[jj]);
             // print intermediate ctxts? 
             //cout << "const term of ctxt " << jj << " = " << intermediateCtxts[jj][0] << endl; 
         }
+	duration.Tick("");
 
         if (i == nvec.size() - 1) {
             return intermediateCtxts;

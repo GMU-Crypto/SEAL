@@ -51,6 +51,17 @@ void verifier_state(byte tape[PRNG_IN],
     }
     if (DEBUG) std::cout << "End share_at" << std::endl;
 
+    /* Simulate Mixed Statement additional tables generation */
+    if (MIXED_STATEMENT) {
+	for (unsigned int b = 0; b < 2; b++) {
+            for (unsigned int i = 0; i < 8*H_OUT; i++) {
+                for (unsigned int j = 0; j < NUM_ITERATION; j++) {
+                    share_at(y_shares[0][j],y[0],1,(*eps)[j],r[j]);
+                }
+            }
+        }
+    }
+
 }
 
 void run_verifier_state() {

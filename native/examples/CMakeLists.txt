@@ -7,6 +7,7 @@ project(SEALExamples VERSION 3.2.0 LANGUAGES CXX)
 
 # Executable will be in ../bin
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
+SET ( CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=c++11 -O3 -march=core-avx2 -msse" )
 
 add_executable(sealexamples examples.cpp /home/poa/MP-SPDZ/good_index.cpp share_at.cpp verifier_state.cpp pir.cpp pir_server.cpp pir_client.cpp)
 
@@ -14,8 +15,8 @@ add_executable(sealexamples examples.cpp /home/poa/MP-SPDZ/good_index.cpp share_
 find_package(SEAL 3.2.0 EXACT REQUIRED)
 
 # Link Microsoft SEAL
-target_link_libraries(sealexamples SEAL::seal)
-
+#target_link_libraries(sealexamples SEAL::seal)
+target_link_libraries(sealexamples SEAL::seal ntl m gmp)
 
 # Link additional external libraries
 target_link_libraries(sealexamples gmp gmpxx cryptopp)
