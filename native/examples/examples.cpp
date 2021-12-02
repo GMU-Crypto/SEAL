@@ -187,8 +187,8 @@ void oneofnot() {
     uint64_t number_of_items = NUM_KEYS;
     cout << "Number of items: " << number_of_items << endl;
     //2^27 goal.
-    uint64_t size_per_item = 1280; 
-    //uint64_t size_per_item = 1600; // in bytes
+    //uint64_t size_per_item = 1280; 
+    uint64_t size_per_item = 1600; // in bytes
     //Yeah, we need 3 parties and 25 iterations. 
     //However, we only need to send m-1 shares per iteration as the last one can be recovered using y_i.
     // So each entry will have 2x25x256 bits = 1600 bytes

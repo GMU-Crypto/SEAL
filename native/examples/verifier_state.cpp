@@ -3,6 +3,7 @@
 #include <cryptopp/osrng.h>
 #include <chrono>
 #include <iostream> 
+#include <thread>
 
 //using namespace CryptoPP;
 
@@ -40,28 +41,54 @@ void verifier_state(byte tape[PRNG_IN],
     byte r[NUM_ITERATION][PRNG_IN];
     prng.GenerateBlock((byte *)r,NUM_ITERATION*PRNG_IN);
     if (DEBUG) std::cout << "Starting share_at" << std::endl;
-    for (unsigned int j=0; j<NUM_ITERATION; j++) {
-        if (DEBUG) std::cout << "\tIteration " << j << std::endl;
+    //for (unsigned int j=0; j<NUM_ITERATION; j++) {
+    //
+    auto table_thread_ftn = 
+      [](unsigned int j, 
+         byte **y,
+         byte ***y_shares, 
+         std::vector<Integer> *eps,
+         byte r[NUM_ITERATION][PRNG_IN] ) {
+
+        if (DEBUG) std::cout << "\tThread " << j << " start" << std::endl;
         share_at(y_shares[0][j],y[0],H_OUT,(*eps)[j],r[j]);
         for (unsigned int i=1; i<NUM_KEYS; i++) {
             for (unsigned int b = 0; b<H_OUT; b++) {
                 y_shares[i][j][b] = y_shares[0][j][b] ^ y[0][b] ^ y[i][b];
             }
         }
+        if (DEBUG) std::cout << "\tThread " << j << " end" << std::endl;
+    };
+    std::thread threads[NUM_ITERATION];
+    for (unsigned int j=0; j<NUM_ITERATION; j++) {
+        threads[j] = std::thread(table_thread_ftn, j, y, y_shares, eps, r);
+    }
+    for (unsigned int j=0; j<NUM_ITERATION; j++) {
+        threads[j].join();
     }
     if (DEBUG) std::cout << "End share_at" << std::endl;
 
     /* Simulate Mixed Statement additional tables generation */
     if (MIXED_STATEMENT) {
-	for (unsigned int b = 0; b < 2; b++) {
-            for (unsigned int i = 0; i < 8*H_OUT; i++) {
-                for (unsigned int j = 0; j < NUM_ITERATION; j++) {
+        auto mixed_thread_ftn = 
+          [](unsigned int j, 
+             byte **y,
+             byte ***y_shares, 
+             std::vector<Integer> *eps,
+             byte r[NUM_ITERATION][PRNG_IN] ) {
+            for (unsigned int b = 0; b < 2; b++) {
+                for (unsigned int i = 0; i < 8*H_OUT; i++) {
                     share_at(y_shares[0][j],y[0],1,(*eps)[j],r[j]);
                 }
             }
+        };
+        for (unsigned int j=0; j<NUM_ITERATION; j++) {
+            threads[j] = std::thread(table_thread_ftn, j, y, y_shares, eps, r);
+        }
+        for (unsigned int j=0; j<NUM_ITERATION; j++) {
+            threads[j].join();
         }
     }
-
 }
 
 void run_verifier_state() {
