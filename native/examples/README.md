@@ -22,3 +22,10 @@ On client, run SEAL/native/examples/client_poly.cpp as
 cd MP-SPDZ
 g++ good_index_client.cpp && ./a.out
 ````
+#### MPCitH
+Runs run_verifier_state_network() instead of run_verifier_state().
+On client, run /SEAL/native/examples/verifier_state_client.cpp as
+````
+cd MP-SPDZ
+/home/poa/SEAL/native/examples/verifier_state_client.cpp
+````
