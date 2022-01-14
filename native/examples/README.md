@@ -14,6 +14,7 @@ To run as server, change in native/examples/examples.cpp
 ````
 #define NETWORKING 1 
 ````
+and remove run_good_index_network(0); from L212 (add it back when finished)
 #### Bounded noise
 Runs run_good_index_network() instead of run_good_index().
 On client, run SEAL/native/examples/client_poly.cpp as
