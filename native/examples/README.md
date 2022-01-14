@@ -33,6 +33,5 @@ g++ good_index_client.cpp && ./a.out
 Runs run_verifier_state_network() instead of run_verifier_state().
 On client, run /SEAL/native/examples/verifier_state_client.cpp as
 ````
-cd MP-SPDZ
-/home/poa/SEAL/native/examples/verifier_state_client.cpp
+cd ~/SEAL/native/examples/ && g++ verifier_state_client.cpp && ./a.out
 ````
