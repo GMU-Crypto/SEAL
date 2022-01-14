@@ -4,7 +4,10 @@
 #### PIR
 Go to SealPIR/CMakeLists.txt
 and change main.cpp to server,coo and client.cpp accordingly. 
-
+Then 
+````
+cd ~\SealPIR && cmake . -DSEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF && make && bin/./main
+````
 #### Polynomial interpolation
 To run polynomial interpolation of PI_Goodindex as client, change L12 of native/examples/CMakeLists.txt into
 ````
