@@ -15,11 +15,16 @@
 #include <unistd.h>
 #include <string.h>
 #include <ctime>
+#include <chrono>
+#include <thread>
 #define PORT 12345
 
 using namespace std::chrono;
 using namespace std;
 using namespace seal;
+using namespace std::this_thread;     // sleep_for, sleep_until
+using namespace std::chrono_literals; // ns, us, ms, s, h, etc.
+using std::chrono::system_clock;
 
 inline unsigned int to_uint(char ch)
 {
@@ -46,8 +51,8 @@ int main(int argc, char *argv[]) {
     cout << "Initializing Poly interpolation prover (client)..." << endl;
 
     srand((unsigned)time(NULL) * getpid());  
-    std::string firstreply = gen_random(60);
-    std::string comm_answer = gen_random(32);
+    std::string firstreply = gen_random(65536);
+    std::string comm_answer = gen_random(16);
     std::string answer = gen_random(sizeof(uint64_t));
 
 
@@ -81,30 +86,21 @@ int main(int argc, char *argv[]) {
         cout << "Connected to server" << endl;
     }
 
-    cout << "Receiving seed.." << endl;
-    uint32_t msgLength;
-    recv(sock,&msgLength,sizeof(uint32_t),0); // Receive the message length
-    //msgLength = ntohl(msgLength); // Ensure host system byte order
-    std::cout << "Seed length: " <<msgLength <<endl;
 
+    sleep_for(1000000ns);
+
+    //send firstreply:  send 2x2x64xN bits= 65536 bytes
+    uint32_t msgLength;
     std::vector<unsigned char> pkt ;
     std::string temp ;
-    pkt.resize(msgLength,0x00);
-    recv(sock,&(pkt[0]),msgLength,0); // Receive the message data
-    temp = { pkt.begin(), pkt.end() } ;
-
-    printf("Seed received\n");
-    std::cout << "Actual seed length: " <<temp.size() <<endl;
-    std::cout << "Correctness check:" << to_uint(temp.at(10)) << endl;
- 
- 
-    //send firstreply: 2x12xN bits (N=20) = 60 bytes
     msgLength = firstreply.length();
     std::cout << "() Sending firstreply of length " << msgLength << endl;
     send(sock,&msgLength ,sizeof(uint32_t) ,0); // Send the message length
     send(sock,firstreply.c_str() ,msgLength ,0); // Send the message data 
     std::cout << "() First reply sent." << endl;
     std::cout << "Correctness check:" << to_uint(firstreply.at(10)) << endl;
+
+    sleep_for(1000000ns);
 
     //receive c_i
     cout << "Receiving c_i.." << endl;
@@ -118,13 +114,45 @@ int main(int argc, char *argv[]) {
     std::cout << "Actual c_i length: " <<temp.size() <<endl;
     std::cout << "Correctness check:" << to_uint(temp.at(10)) << endl;
 
-    //Client: Comm(answer) (not listed) send 32 bytes 
+    sleep_for(1000000ns);
+
+    //Client: Comm(answer) (not listed) send 16 bytes 
     msgLength = comm_answer.length();
     std::cout << "() Sending Comm(answer) of length " << msgLength << endl;
     send(sock,&msgLength ,sizeof(uint32_t) ,0); // Send the message length
     send(sock,comm_answer.c_str() ,msgLength ,0); // Send the message data 
     std::cout << "() Comm(answer) sent." << endl;
     std::cout << "Correctness check:" << to_uint(comm_answer.at(10)) << endl;
+
+    sleep_for(1000000ns);
+
+    cout << "Receiving seed.." << endl;
+    recv(sock,&msgLength,sizeof(uint32_t),0); // Receive the message length
+    //msgLength = ntohl(msgLength); // Ensure host system byte order
+    std::cout << "Seed length: " <<msgLength <<endl;
+    msgLength = 16;
+    pkt.resize(msgLength,0x00);
+    recv(sock,&(pkt[0]),msgLength,0); // Receive the message data
+    temp = { pkt.begin(), pkt.end() } ;
+
+    printf("Seed received\n");
+    std::cout << "Actual seed length: " <<temp.size() <<endl;
+    std::cout << "Correctness check:" << to_uint(temp.at(10)) << endl;
+
+
+    sleep_for(1000000ns);
+
+    //Client: Send answer 
+    msgLength = answer.length();
+    std::cout << "() Sending answer of length " << msgLength << endl;
+    send(sock,&msgLength ,sizeof(uint32_t) ,0); // Send the message length
+    send(sock,answer.c_str() ,msgLength ,0); // Send the message data 
+    std::cout << "() answer sent." << endl;
+    std::cout << "Correctness check:" << to_uint(answer.at(5)) << endl;
+
+
+
+/*
    
     //Server: Receive seed (?) -random number
     cout << "Receiving seed.." << endl;
@@ -137,13 +165,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Actual seed length: " <<temp.size() <<endl;
     std::cout << "Correctness check:" << to_uint(temp.at(10)) << endl;
 
-    //Client: Send answer 
-    msgLength = answer.length();
-    std::cout << "() Sending answer of length " << msgLength << endl;
-    send(sock,&msgLength ,sizeof(uint32_t) ,0); // Send the message length
-    send(sock,answer.c_str() ,msgLength ,0); // Send the message data 
-    std::cout << "() answer sent." << endl;
-    std::cout << "Correctness check:" << to_uint(answer.at(5)) << endl;
+*/
 
     return 0;
 }
