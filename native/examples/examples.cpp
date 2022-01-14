@@ -211,7 +211,7 @@ int main()
 {
     if (NETWORKING) {run_good_index_network(0);} else {run_good_index(0);} // fill in parameter with correct index
     if (NETWORKING) {poly_interp_network();} else {oneofnot();}
-    run_verifier_state();
+    if (NETWORKING) {run_verifier_state_network();} else {run_verifier_state();}
     
     //example_sealpir();
     return 0;
