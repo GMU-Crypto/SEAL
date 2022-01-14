@@ -49,6 +49,9 @@ using namespace seal;
 using std::chrono::high_resolution_clock;
 using std::chrono::duration_cast;
 using std::chrono::microseconds;
+using namespace std::this_thread;     // sleep_for, sleep_until
+using namespace std::chrono_literals; // ns, us, ms, s, h, etc.
+using std::chrono::system_clock;
 
 inline unsigned int to_uint(char ch)
 {
@@ -209,9 +212,9 @@ void poly_interp_network();
 
 int main()
 {
-    if (NETWORKING) {run_good_index_network(0);} else {run_good_index(0);} // fill in parameter with correct index
+    //if (NETWORKING) {run_good_index_network(0);} else {run_good_index(0);} // fill in parameter with correct index
     if (NETWORKING) {poly_interp_network();} else {oneofnot();}
-    if (NETWORKING) {run_verifier_state_network();} else {run_verifier_state();}
+    //if (NETWORKING) {run_verifier_state_network();} else {run_verifier_state();}
     
     //example_sealpir();
     return 0;
@@ -419,7 +422,7 @@ void poly_interp_network() {
     uint32_t N = 2048;
     random_device rd;
     std::string seed = gen_random(16);
-    std::string c_i = gen_random(240);
+    std::string c_i = gen_random(131088);
 
 
     //Setting up network socket - server role
@@ -491,20 +494,11 @@ void poly_interp_network() {
     //Polynomial interpolation test code
     auto time_decode_polys = chrono::high_resolution_clock::now();
 
-    //Server: Comm(seed) (not listed?) send random 16 bytes at line 346
-    uint32_t msgLength = seed.length();
-    std::cout << "Seed length: " <<msgLength <<endl;
-    //uint32_t sndMsgLength = htonl(msgLength); // Ensure network byte order
-    std::cout << "() Sending seed..." << endl;
-    send(new_socket,&msgLength ,sizeof(uint32_t) ,0); // Send the message length
-    send(new_socket,seed.c_str() ,msgLength ,0); // Send the message data 
-    std::cout << "() Seed sent." << endl;
-    std::cout << "Correctness check:" << to_uint(seed.at(10)) << endl;
 
+    //Client: Receive 2x2x64xN bits= 65536 bytes
 
-    //Client: Receive 2x12xN bits
     cout << "Receiving first reply.." << endl;
-    msgLength = seed.length();
+    uint32_t msgLength = seed.length();
     recv(new_socket,&msgLength,sizeof(uint32_t),0); // Receive the message length
     std::cout << "First reply length: " <<msgLength <<endl;
 
@@ -517,6 +511,7 @@ void poly_interp_network() {
     std::cout << "() First reply received." << endl;
     std::cout << "Actual reply length: " <<temp.size() <<endl;
     std::cout << "Correctness check:" << to_uint(temp.at(10)) << endl;
+
 
 
     uint64_t modulus = (1 << 13) - 1;
@@ -537,7 +532,12 @@ void poly_interp_network() {
     vector<uint64_t> Px = p.generate_random_evaluation();
     std::cout << Px[missing_index] << '\n';
     
-    //Server: send Px (line 357) Enc(Px)+r*Enc(query) (not listed) simulate N*12*2 *4 bits
+    sleep_for(1000000ns);
+
+    //Server: Comm(seed) (not listed?) send random 16 bytes at line 346
+    //Enc(Px)+r*Enc(query) (not listed) simulate N*64*2 *4 bits
+    // = 131088 bytes total
+
     msgLength = c_i.length();
     std::cout << "c_i length: " <<msgLength <<endl;
     //uint32_t sndMsgLength = htonl(msgLength); // Ensure network byte order
@@ -546,6 +546,7 @@ void poly_interp_network() {
     send(new_socket,c_i.c_str() ,msgLength ,0); // Send the message data 
     std::cout << "() c_i sent." << endl;
     std::cout << "Correctness check:" << to_uint(c_i.at(10)) << endl;  
+
 
 
     vector<uint64_t> points, values;
@@ -557,7 +558,9 @@ void poly_interp_network() {
     
     uint64_t answer = p.compute_p0(points, values);
 
-    //Client receive: Comm(answer) (not listed) send 32 bytes after 372
+
+    sleep_for(1000000ns);
+    //Client receive: Comm(answer) (not listed) receive 16 bytes after 372
     cout << "Receiving Comm(answer).." << endl;
     msgLength = seed.length();
     recv(new_socket,&msgLength,sizeof(uint32_t),0); // Receive the message length
@@ -569,9 +572,9 @@ void poly_interp_network() {
     std::cout << "Actual Comm(answer) length: " <<temp.size() <<endl;
     std::cout << "Correctness check:" << to_uint(temp.at(10)) << endl;
 
+    sleep_for(1000000ns);
 
-
-    //Server: Send seed (?) -random number
+    //Server: Decommit seed = 128 bits = 16 bytes
     msgLength = seed.length();
     std::cout << "Seed length: " <<msgLength <<endl;
     //uint32_t sndMsgLength = htonl(msgLength); // Ensure network byte order
@@ -581,6 +584,7 @@ void poly_interp_network() {
     std::cout << "() Seed sent." << endl;
     std::cout << "Correctness check:" << to_uint(seed.at(10)) << endl;
 
+    sleep_for(1000000ns);
 
     //Client: Receive answer (double check with Phi hung)
     cout << "Receiving answer.." << endl;
@@ -593,6 +597,20 @@ void poly_interp_network() {
     std::cout << "() answer received." << endl;
     std::cout << "Actual answer length: " <<temp.size() <<endl;
     std::cout << "Correctness check:" << to_uint(temp.at(5)) << endl;
+
+
+/*
+    //Server: Comm(seed) (not listed?) send random 16 bytes at line 346
+    msgLength = seed.length();
+    std::cout << "Seed length: " <<msgLength <<endl;
+    //uint32_t sndMsgLength = htonl(msgLength); // Ensure network byte order
+    std::cout << "() Sending seed..." << endl;
+    send(new_socket,&msgLength ,sizeof(uint32_t) ,0); // Send the message length
+    send(new_socket,seed.c_str() ,msgLength ,0); // Send the message data 
+    std::cout << "() Seed sent." << endl;
+    std::cout << "Correctness check:" << to_uint(seed.at(10)) << endl;
+*/
+
 
 
 
