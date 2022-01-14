@@ -28,15 +28,48 @@
 #include "verifier_state.h"
 #include "constants.h"
 
-//#include <typeinfo>
+#define NETWORKING 1 
+// Also set at SEAL/native/examples/verifier_state.cpp and MP-SPDZ/good_index.cpp
+#include <unistd.h>
+#include <stdio.h>
+#include <sys/socket.h>
+#include <stdlib.h>
+#include <netinet/in.h>
+#include <string.h>
+#include<strings.h>
+#include<iostream>
+#include<sys/types.h>
+#include <arpa/inet.h>
+#define PORT 12345
 
-//using namespace std;
+
 using std::cout;
 using std::endl;
 using namespace seal;
 using std::chrono::high_resolution_clock;
 using std::chrono::duration_cast;
 using std::chrono::microseconds;
+
+inline unsigned int to_uint(char ch)
+{
+    // EDIT: multi-cast fix as per David Hammen's comment
+    return static_cast<unsigned int>(static_cast<unsigned char>(ch));
+}
+
+std::string gen_random(const int len) {
+    static const char alphanum[] =
+        "0123456789"
+        "abcdef";
+    std::string tmp_s;
+    tmp_s.reserve(len);
+
+    for (int i = 0; i < len; ++i) {
+        tmp_s += alphanum[rand() % (sizeof(alphanum) - 1)];
+    }
+    
+    return tmp_s;
+}
+
 /*
 Helper function: Prints the name of the example in a fancy banner.
 */
@@ -172,10 +205,12 @@ void example_sealpir();
 
 void oneofnot();
 
+void poly_interp_network();
+
 int main()
 {
-    run_good_index(0); // fill in parameter with correct index
-    oneofnot();
+    if (NETWORKING) {run_good_index_network(0);} else {run_good_index(0);} // fill in parameter with correct index
+    if (NETWORKING) {poly_interp_network();} else {oneofnot();}
     run_verifier_state();
     
     //example_sealpir();
@@ -208,7 +243,7 @@ void oneofnot() {
     EncryptionParameters params(scheme_type::BFV);
     PirParams pir_params;
     gen_params(number_of_items, size_per_item, N, logt, d, params, pir_params);
-
+cout << "TEST"   << endl;
     auto time_create_db_s = high_resolution_clock::now();
     // Create test database
     auto db(make_unique<uint8_t[]>(number_of_items * size_per_item));
@@ -378,7 +413,196 @@ ptr++;
 
 }
 
+void poly_interp_network() {
 
+    //uint32_t N = LOG_NUM_KEYS < 20 ? 1024 : 2048; //degree polynomial for LWE
+    uint32_t N = 2048;
+    random_device rd;
+    std::string seed = gen_random(16);
+    std::string c_i = gen_random(240);
+
+
+    //Setting up network socket - server role
+    int server_fd, new_socket, valread;
+    struct sockaddr_in address;
+    int opt = 1;
+    int addrlen = sizeof(address);
+       
+    // Creating socket file descriptor
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
+    {
+        perror("socket failed");
+        exit(EXIT_FAILURE);
+    }
+       
+    // Forcefully attaching socket to the port 8080
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT,
+                                                  &opt, sizeof(opt)))
+    {
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons( PORT );
+       
+    // Forcefully attaching socket to the port 8080
+    if (bind(server_fd, (struct sockaddr *)&address, 
+                                 sizeof(address))<0)
+    {
+        perror("bind failed");
+        exit(EXIT_FAILURE);
+    }
+    if (listen(server_fd, 3) < 0)
+    {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        cout << "Listening for poly interp..." << endl;
+    }
+
+    //Step 2 Wait for connection
+    if ((new_socket = accept(server_fd, (struct sockaddr *)&address, 
+                       (socklen_t*)&addrlen))<0)
+    {
+        perror("accept");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        cout << "(2) Connection accepted" << endl;
+    }
+
+
+    //ctxts_ser = ctxts::str();
+    //uint32_t msgLength = ctxts.get_length();
+    //uint32_t sndMsgLength = htonl(msgLength); // Ensure network byte order
+    //std::cout << "(3) Sending ctexts..." << endl;
+    //send(new_socket,&sndMsgLength ,sizeof(uint32_t) ,0); // Send the message length
+    //send(new_socket,ctxts.serialize() ,msgLength ,0); // Send the message data 
+    //std::cout << "(3) Correctness test for ctexts:"  << ctxts.hash() << endl;
+
+
+
+
+
+    //Polynomial interpolation test code
+    auto time_decode_polys = chrono::high_resolution_clock::now();
+
+    //Server: Comm(seed) (not listed?) send random 16 bytes at line 346
+    uint32_t msgLength = seed.length();
+    std::cout << "Seed length: " <<msgLength <<endl;
+    //uint32_t sndMsgLength = htonl(msgLength); // Ensure network byte order
+    std::cout << "() Sending seed..." << endl;
+    send(new_socket,&msgLength ,sizeof(uint32_t) ,0); // Send the message length
+    send(new_socket,seed.c_str() ,msgLength ,0); // Send the message data 
+    std::cout << "() Seed sent." << endl;
+    std::cout << "Correctness check:" << to_uint(seed.at(10)) << endl;
+
+
+    //Client: Receive 2x12xN bits
+    cout << "Receiving first reply.." << endl;
+    msgLength = seed.length();
+    recv(new_socket,&msgLength,sizeof(uint32_t),0); // Receive the message length
+    std::cout << "First reply length: " <<msgLength <<endl;
+
+    std::vector<unsigned char> pkt ;
+    std::string temp ;
+    pkt.resize(msgLength,0x00);
+    recv(new_socket,&(pkt[0]),msgLength,0); // Receive the message data
+    temp = { pkt.begin(), pkt.end() } ;
+
+    std::cout << "() First reply received." << endl;
+    std::cout << "Actual reply length: " <<temp.size() <<endl;
+    std::cout << "Correctness check:" << to_uint(temp.at(10)) << endl;
+
+
+    uint64_t modulus = (1 << 13) - 1;
+    int degree = N-2; // = N-2 and is even
+    int n = degree + 1;
+    int N2 = degree + 2;
+    std::uniform_int_distribution<int> dist(0, N2);
+    
+    //cout << dist. << endl;
+    //std::cout << typeid(db).name() << '\n';
+
+    //long missing_index = ele_index;
+    long missing_index = rd() % degree; //Is this correct?
+    cout << "Missing index " << missing_index << endl;
+    
+    PolynomialWithFastVerification p(modulus, N2);
+
+    vector<uint64_t> Px = p.generate_random_evaluation();
+    std::cout << Px[missing_index] << '\n';
+    
+    //Server: send Px (line 357) Enc(Px)+r*Enc(query) (not listed) simulate N*12*2 *4 bits
+    msgLength = c_i.length();
+    std::cout << "c_i length: " <<msgLength <<endl;
+    //uint32_t sndMsgLength = htonl(msgLength); // Ensure network byte order
+    std::cout << "() Sending c_i..." << endl;
+    send(new_socket,&msgLength ,sizeof(uint32_t) ,0); // Send the message length
+    send(new_socket,c_i.c_str() ,msgLength ,0); // Send the message data 
+    std::cout << "() c_i sent." << endl;
+    std::cout << "Correctness check:" << to_uint(c_i.at(10)) << endl;  
+
+
+    vector<uint64_t> points, values;
+    for (int idx = 0; idx <= n; idx++) {
+        if (idx == missing_index) continue;
+        points.push_back(idx + 1);
+        values.push_back(Px[idx]);
+    }
+    
+    uint64_t answer = p.compute_p0(points, values);
+
+    //Client receive: Comm(answer) (not listed) send 32 bytes after 372
+    cout << "Receiving Comm(answer).." << endl;
+    msgLength = seed.length();
+    recv(new_socket,&msgLength,sizeof(uint32_t),0); // Receive the message length
+    std::cout << "Comm(answer) length: " <<msgLength <<endl;
+    pkt.resize(msgLength,0x00);
+    recv(new_socket,&(pkt[0]),msgLength,0); // Receive the message data
+    temp = { pkt.begin(), pkt.end() } ;
+    std::cout << "() Comm(answer) received." << endl;
+    std::cout << "Actual Comm(answer) length: " <<temp.size() <<endl;
+    std::cout << "Correctness check:" << to_uint(temp.at(10)) << endl;
+
+
+
+    //Server: Send seed (?) -random number
+    msgLength = seed.length();
+    std::cout << "Seed length: " <<msgLength <<endl;
+    //uint32_t sndMsgLength = htonl(msgLength); // Ensure network byte order
+    std::cout << "() Sending seed..." << endl;
+    send(new_socket,&msgLength ,sizeof(uint32_t) ,0); // Send the message length
+    send(new_socket,seed.c_str() ,msgLength ,0); // Send the message data 
+    std::cout << "() Seed sent." << endl;
+    std::cout << "Correctness check:" << to_uint(seed.at(10)) << endl;
+
+
+    //Client: Receive answer (double check with Phi hung)
+    cout << "Receiving answer.." << endl;
+    msgLength = seed.length();
+    recv(new_socket,&msgLength,sizeof(uint32_t),0); // Receive the message length
+    std::cout << "answer length: " <<msgLength <<endl;
+    pkt.resize(msgLength,0x00);
+    recv(new_socket,&(pkt[0]),msgLength,0); // Receive the message data
+    temp = { pkt.begin(), pkt.end() } ;
+    std::cout << "() answer received." << endl;
+    std::cout << "Actual answer length: " <<temp.size() <<endl;
+    std::cout << "Correctness check:" << to_uint(temp.at(5)) << endl;
+
+
+
+    auto time_decode_polye = chrono::high_resolution_clock::now();
+    auto time_decode_polyus = duration_cast<microseconds>(time_decode_polye - time_decode_polys).count();
+    cout << "Answer: " << answer << endl;
+    cout << "Polynomial interpolation time (incl. latency costs): " << time_decode_polyus / 1000 << " ms" << endl;
+
+
+}
 
 void example_sealpir() {
     //uint64_t number_of_items = 1 << 12;
