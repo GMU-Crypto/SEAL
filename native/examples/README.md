@@ -6,7 +6,7 @@ Go to SealPIR/CMakeLists.txt
 and change main.cpp to server.cpp and client.cpp accordingly. 
 Then 
 ````
-cd ~\SealPIR && cmake . -DSEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF && make && bin/./main
+cd ~/SealPIR && cmake . -DSEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF && make && bin/./main
 ````
 #### Polynomial interpolation
 In all below:
